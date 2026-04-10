@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -191,6 +192,10 @@ def find_recent_csv() -> Path | None:
     if best_score == 0:
         return None
     return best_path
+
+
+def is_streamlit_cloud() -> bool:
+    return bool(os.environ.get("STREAMLIT_SHARING_MODE"))
 
 
 def load_snapshot(uploaded_file: Any) -> tuple[dict[str, Any], str]:
@@ -386,15 +391,19 @@ st.sidebar.markdown(
     """
     <div class="upload-tip">
       <div class="eyebrow">Refresh Flow</div>
-      Download the active Google Sheet tab as a CSV. This app will now try to auto-load the newest matching CSV from Downloads.
+      Download the active Google Sheet tab as a CSV, then upload it here to refresh the dashboard.
     </div>
     """,
     unsafe_allow_html=True,
 )
-if st.sidebar.button("Refresh from latest CSV"):
-    st.rerun()
+uploader_label = "Upload CSV export of `Master total_for Dane`"
+if not is_streamlit_cloud():
+    st.sidebar.caption("Local shortcut: auto-load the newest matching CSV from Downloads.")
+    if st.sidebar.button("Refresh from latest CSV"):
+        st.rerun()
+    uploader_label = "Or upload CSV export of `Master total_for Dane`"
 uploaded_file = st.sidebar.file_uploader(
-    "Or upload CSV export of `Master total_for Dane`",
+    uploader_label,
     type=["csv"],
     help="In Google Sheets: File -> Download -> Comma-separated values (.csv) for the active tab.",
 )
