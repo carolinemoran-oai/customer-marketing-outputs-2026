@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dane Content Dashboard</title>
+    <meta
+      name="description"
+      content="A dashboard built from the Master total_for Dane tab to track ships, goals, and pipeline mix."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=DM+Serif+Display:ital@0;1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <p class="eyebrow">Sheet Snapshot</p>
+          <h1>Dane Dashboard</h1>
+          <p class="sidebar-copy">
+            A focused view of shipped content, current in-progress work, and
+            goal pacing from the `Master total_for Dane` tab.
+          </p>
+        </div>
+
+        <nav class="sidebar-nav" aria-label="Primary">
+          <a class="nav-link active" href="#overview">Overview</a>
+          <a class="nav-link" href="#performance">Category Mix</a>
+          <a class="nav-link" href="#regions">Goals</a>
+          <a class="nav-link" href="#activity">Pipeline</a>
+        </nav>
+
+        <section class="focus-card">
+          <p class="focus-label">Current Focus</p>
+          <h2 id="focusHeadline">Goal pacing and category balance</h2>
+          <p>
+            This dashboard treats the sheet as the source of truth and turns its
+            custom layout into a cleaner readout.
+          </p>
+        </section>
+      </aside>
+
+      <main class="dashboard">
+        <header class="topbar" id="overview">
+          <div>
+            <p class="eyebrow">Master total_for Dane</p>
+            <h2>See shipped volume, progress to goal, and the active content mix in one place.</h2>
+          </div>
+          <div class="topbar-actions">
+            <div class="date-chip" id="reportingDate">Reporting window</div>
+            <button class="button ghost" type="button">Share Snapshot</button>
+            <button class="button primary" type="button">Refresh Sheet Data</button>
+          </div>
+        </header>
+
+        <section class="hero-panel">
+          <div class="hero-copy">
+            <p class="eyebrow">Live Read</p>
+            <h3 id="heroHeadline">Social and quote banks are carrying most of the shipped volume right now.</h3>
+            <p>
+              The visuals below are derived from the sheet snapshot you linked,
+              with the messy multi-column tab reorganized into clearer category,
+              goal, and pipeline views.
+            </p>
+          </div>
+          <div class="segment-control" aria-label="Dashboard views">
+            <button class="segment active" data-period="ships" type="button">Ships</button>
+            <button class="segment" data-period="annual" type="button">Annual Goals</button>
+            <button class="segment" data-period="quarterly" type="button">Quarterly Goals</button>
+          </div>
+        </section>
+
+        <section class="metrics-grid" aria-label="Key metrics">
+          <article class="metric-card spotlight">
+            <div class="metric-label">Ships Grand Total</div>
+            <div class="metric-value" id="revenueValue">0</div>
+            <div class="metric-foot">
+              <span class="delta positive" id="revenueDelta">0%</span>
+              <span id="revenueNarrative">of annual goal complete</span>
+            </div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-label">Written + Social</div>
+            <div class="metric-value" id="leadsValue">0</div>
+            <div class="metric-foot">
+              <span class="delta positive" id="leadsDelta">0%</span>
+              <span>of shipped total</span>
+            </div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-label">Tracked Categories</div>
+            <div class="metric-value" id="conversionValue">0</div>
+            <div class="metric-foot">
+              <span class="delta positive" id="conversionDelta">0</span>
+              <span>content lanes monitored</span>
+            </div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-label">Top Goal Progress</div>
+            <div class="metric-value" id="retentionValue">0%</div>
+            <div class="metric-foot">
+              <span class="delta negative" id="retentionDelta">0</span>
+              <span>best annual completion</span>
+            </div>
+          </article>
+        </section>
+
+        <section class="content-grid" id="performance">
+          <article class="panel chart-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Category Trend</p>
+                <h3 id="trendTitleText">Ships by content type</h3>
+              </div>
+              <span class="panel-badge" id="trendSummary">Stable lift</span>
+            </div>
+            <svg
+              class="trend-chart"
+              viewBox="0 0 700 260"
+              role="img"
+              aria-labelledby="trendTitle trendDesc"
+            >
+              <title id="trendTitle">Dashboard chart</title>
+              <desc id="trendDesc">A chart showing values from the Master total_for Dane tab.</desc>
+              <g class="chart-grid">
+                <line x1="40" y1="36" x2="660" y2="36"></line>
+                <line x1="40" y1="96" x2="660" y2="96"></line>
+                <line x1="40" y1="156" x2="660" y2="156"></line>
+                <line x1="40" y1="216" x2="660" y2="216"></line>
+              </g>
+              <polyline id="trendArea" class="trend-area" points=""></polyline>
+              <polyline id="trendLine" class="trend-line" points=""></polyline>
+              <g id="trendDots"></g>
+              <g id="trendLabels"></g>
+            </svg>
+          </article>
+
+          <article class="panel breakdown-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Category Breakdown</p>
+                <h3 id="breakdownTitle">Shipped volume by lane</h3>
+              </div>
+              <span class="panel-badge">Ranked by contribution</span>
+            </div>
+            <div class="bars" id="channelBars"></div>
+          </article>
+
+          <article class="panel insight-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Signal</p>
+                <h3>What stands out</h3>
+              </div>
+            </div>
+            <ul class="insight-list" id="insightList"></ul>
+          </article>
+
+          <article class="panel regions-panel" id="regions">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Goal Progress</p>
+                <h3 id="tableTitle">Annual goal snapshot</h3>
+              </div>
+              <span class="panel-badge">Progress pulled from the sheet</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Total</th>
+                    <th>Progress</th>
+                    <th>Remaining</th>
+                  </tr>
+                </thead>
+                <tbody id="regionTable"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel activity-panel" id="activity">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Pipeline Detail</p>
+                <h3 id="activityTitle">Representative items from the tab</h3>
+              </div>
+              <span class="panel-badge">Sheet rows reorganized by category</span>
+            </div>
+            <div class="activity-list" id="activityList"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
