@@ -561,14 +561,32 @@ with right:
     st.subheader("Quarterly View")
     if quarterly_metrics:
         quarterly_df = pd.DataFrame(quarterly_metrics)
-        quarterly_long = quarterly_df.melt(
-            id_vars=["name", "goal"],
-            value_vars=["q1", "q2", "q3", "q4"],
-            var_name="Quarter",
-            value_name="Progress %",
+        selected_quarter = st.selectbox(
+            "Choose a quarter",
+            ["Q1", "Q2", "Q3", "Q4"],
+            key="quarterly_view_selector",
+        )
+        quarter_column = selected_quarter.lower()
+        selected_quarter_df = quarterly_df[["name", "goal", quarter_column]].rename(
+            columns={
+                "name": "Category",
+                "goal": "Quarterly Goal",
+                quarter_column: "Progress %",
+            }
+        )
+        top_quarter_row = selected_quarter_df.sort_values("Progress %", ascending=False).iloc[0]
+        st.markdown(
+            f"""
+            <div class="glass" style="margin-bottom:0.85rem;">
+              <div class="metric-label">{selected_quarter} Snapshot</div>
+              <div class="metric-value" style="font-size:2rem;">{top_quarter_row["Progress %"]:.0f}%</div>
+              <div class="metric-note">{top_quarter_row["Category"]} is the furthest ahead this quarter.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
         st.dataframe(
-            quarterly_long.rename(columns={"name": "Category", "goal": "Quarterly Goal"}).style.format(
+            selected_quarter_df.style.format(
                 {"Quarterly Goal": "{:.2f}", "Progress %": "{:.0f}%"}
             ),
             use_container_width=True,
