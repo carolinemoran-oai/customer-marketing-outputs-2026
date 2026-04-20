@@ -71,51 +71,68 @@ def parse_snapshot(df: pd.DataFrame) -> dict[str, Any]:
     last_updated = ""
     annual_metrics: list[Metric] = []
     quarterly_metrics: list[dict[str, Any]] = []
+
     def cell(row_index: int, col_index: int) -> str:
         if row_index >= len(df.index) or col_index >= len(df.columns):
             return ""
         return clean_text(df.iat[row_index, col_index])
+
+    def find_cell(target: str) -> tuple[int, int] | None:
+        target_normalized = target.strip().lower()
+        for row_index in range(len(df.index)):
+            for col_index in range(len(df.columns)):
+                if cell(row_index, col_index).strip().lower() == target_normalized:
+                    return row_index, col_index
+        return None
+
+    def first_number_below(row_index: int, col_index: int) -> float | None:
+        for next_row in range(row_index + 1, len(df.index)):
+            value = parse_number(cell(next_row, col_index))
+            if value is not None:
+                return value
+            if cell(next_row, col_index):
+                break
+        return None
 
     title_row = [clean_text(value) for value in df.iloc[0].tolist()] if len(df.index) else []
     for value in title_row:
         if value.lower().startswith("last updated:"):
             last_updated = value.split(":", 1)[1].strip()
 
-    annual_rows = [
-        ("Written", 1),
-        ("Social", 2),
-        ("Testimonial", 3),
-        ("Brand/Inno", 4),
-    ]
-    for expected_name, row_index in annual_rows:
-        category = cell(row_index, 14) or expected_name
-        goal = parse_number(cell(row_index, 15))
-        progress = parse_number(cell(row_index, 16))
-        if goal is not None:
-            annual_metrics.append(
-                Metric(name=category, goal=goal, progress=progress, total=0)
-            )
+    annual_goals_anchor = find_cell("Annual goals")
+    if annual_goals_anchor is not None:
+        annual_row, annual_col = annual_goals_anchor
+        for row_index in range(annual_row + 1, len(df.index)):
+            category = cell(row_index, annual_col)
+            if not category or category == "Quarterly goals":
+                break
+            goal = parse_number(cell(row_index, annual_col + 1))
+            progress = parse_number(cell(row_index, annual_col + 2))
+            if goal is not None:
+                annual_metrics.append(
+                    Metric(name=category, goal=goal, progress=progress, total=0)
+                )
 
-    quarterly_rows = [
-        ("Written", 7),
-        ("Social", 8),
-        ("Testimonial", 9),
-        ("Brand/Inno", 10),
-    ]
-    for expected_name, row_index in quarterly_rows:
-        category = cell(row_index, 14) or expected_name
-        if not category:
-            continue
-        quarterly_metrics.append(
-            {
-                "name": category,
-                "goal": parse_number(cell(row_index, 15)) or 0,
-                "q1": parse_number(cell(row_index, 16)) or 0,
-                "q2": parse_number(cell(row_index, 17)) or 0,
-                "q3": parse_number(cell(row_index, 18)) or 0,
-                "q4": parse_number(cell(row_index, 19)) or 0,
-            }
-        )
+    quarterly_goals_anchor = find_cell("Quarterly goals")
+    if quarterly_goals_anchor is not None:
+        quarterly_row, quarterly_col = quarterly_goals_anchor
+        for row_index in range(quarterly_row + 1, len(df.index)):
+            category = cell(row_index, quarterly_col)
+            if not category:
+                break
+            goal = parse_number(cell(row_index, quarterly_col + 1))
+            if goal is None:
+                continue
+            quarterly_metrics.append(
+                {
+                    "name": category,
+                    "goal": goal,
+                    "q1": parse_number(cell(row_index, quarterly_col + 2)) or 0,
+                    "q2": parse_number(cell(row_index, quarterly_col + 3)) or 0,
+                    "q3": parse_number(cell(row_index, quarterly_col + 4)) or 0,
+                    "q4": parse_number(cell(row_index, quarterly_col + 5)) or 0,
+                }
+            )
 
     category_pairs = [
         ("Written", 0, 1),
@@ -128,7 +145,10 @@ def parse_snapshot(df: pd.DataFrame) -> dict[str, Any]:
 
     pipeline: dict[str, list[dict[str, Any]]] = {name: [] for name, _, _ in category_pairs}
     totals: dict[str, float] = {}
-    ships_grand_total = parse_number(cell(2, 12)) or 0.0
+    ships_grand_total = 0.0
+    ships_total_anchor = find_cell("Ships Grand Total")
+    if ships_total_anchor is not None:
+        ships_grand_total = first_number_below(*ships_total_anchor) or 0.0
 
     for row_index in range(2, len(df)):
         row_values = [clean_text(value) for value in df.iloc[row_index].tolist()]
@@ -434,8 +454,8 @@ st.markdown(
       </div>
       <div class="hero-stat">
         <div class="eyebrow">Status</div>
-        <p style="font-size:2rem;font-weight:800;margin:0.25rem 0 0.35rem 0;">{percent(overall_progress)}</p>
-        <p style="margin:0;color:#cbd5e1;">Overall progress toward the annual tracked goal.</p>
+        <p style="font-size:2rem;font-weight:800;margin:0.25rem 0 0.35rem 0;">{percent(overall_progress, 1)}</p>
+        <p style="margin:0;color:#cbd5e1;">{whole_number(snapshot["ships_grand_total"])} of {whole_number(snapshot["annual_goal_total"])} annual goal units complete.</p>
         <div style="margin-top:0.95rem;">
           <span class="pill">{f"Updated {snapshot['last_updated']}" if snapshot["last_updated"] else "Awaiting live upload"}</span>
         </div>
@@ -452,7 +472,7 @@ with metric_cols[0]:
         <div class="metric">
           <div class="metric-label">Ships Grand Total</div>
           <div class="metric-value">{int(snapshot["ships_grand_total"])}</div>
-          <div class="metric-note">{percent(overall_progress)} of annual goal complete</div>
+          <div class="metric-note">{percent(overall_progress, 1)} of annual goal complete</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -495,15 +515,6 @@ with metric_cols[3]:
 left, right = st.columns([1.3, 1], gap="large")
 
 with left:
-    st.subheader("Category Mix")
-    category_df = pd.DataFrame(
-        [
-            {"Category": metric.name, "Total": metric.total}
-            for metric in annual_metrics + supporting_metrics
-        ]
-    ).sort_values("Total", ascending=False)
-    st.bar_chart(category_df.set_index("Category"))
-
     st.subheader("Annual Goal Progress")
     annual_df = pd.DataFrame(
         [
@@ -532,32 +543,6 @@ with left:
         )
 
 with right:
-    st.subheader("Signals")
-    if annual_metrics:
-        st.markdown(
-            f"""
-            <div class="insight-stack">
-              <div class="insight">
-                <strong>{top_shipped.name if top_shipped else "Top lane"}</strong>
-                {whole_number(top_shipped.total) if top_shipped else "0"} items make this the biggest visible output lane right now.
-              </div>
-              <div class="insight">
-                <strong>{testimonial.name if testimonial else "Testimonial"} pacing</strong>
-                {percent(testimonial.progress or 0)} puts this lane furthest ahead on annual progress.
-              </div>
-              <div class="insight">
-                <strong>{social.name if social else "Social"} gap</strong>
-                {whole_number(max((social.goal or 0) - social.total, 0)) if social else "0"} items still remain to hit the annual target.
-              </div>
-              <div class="insight">
-                <strong>Support work</strong>
-                {whole_number(quote_banks.total) if quote_banks else "0"} quote-bank items and {whole_number(advocacy.total) if advocacy else "0"} advocacy items sit outside the main goal-tracked total.
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
     st.subheader("Quarterly View")
     if quarterly_metrics:
         quarterly_df = pd.DataFrame(quarterly_metrics)
@@ -645,6 +630,45 @@ with pipeline_right:
             <div class="glass" style="margin-top:0.8rem;">
               <div class="metric-label">Preview</div>
               <div class="metric-note" style="margin-top:0.55rem;">{preview_items}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+bottom_left, bottom_right = st.columns([1.3, 1], gap="large")
+
+with bottom_left:
+    st.subheader("Category Mix")
+    category_df = pd.DataFrame(
+        [
+            {"Category": metric.name, "Total": metric.total}
+            for metric in annual_metrics + supporting_metrics
+        ]
+    ).sort_values("Total", ascending=False)
+    st.bar_chart(category_df.set_index("Category"))
+
+with bottom_right:
+    st.subheader("Signals")
+    if annual_metrics:
+        st.markdown(
+            f"""
+            <div class="insight-stack">
+              <div class="insight">
+                <strong>{top_shipped.name if top_shipped else "Top lane"}</strong>
+                {whole_number(top_shipped.total) if top_shipped else "0"} items make this the biggest visible output lane right now.
+              </div>
+              <div class="insight">
+                <strong>{testimonial.name if testimonial else "Testimonial"} pacing</strong>
+                {percent(testimonial.progress or 0)} puts this lane furthest ahead on annual progress.
+              </div>
+              <div class="insight">
+                <strong>{social.name if social else "Social"} gap</strong>
+                {whole_number(max((social.goal or 0) - social.total, 0)) if social else "0"} items still remain to hit the annual target.
+              </div>
+              <div class="insight">
+                <strong>Support work</strong>
+                {whole_number(quote_banks.total) if quote_banks else "0"} quote-bank items and {whole_number(advocacy.total) if advocacy else "0"} advocacy items sit outside the main goal-tracked total.
+              </div>
             </div>
             """,
             unsafe_allow_html=True,
