@@ -8,6 +8,11 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+GOOGLE_SHEET_CSV_URL = (
+    "https://docs.google.com/spreadsheets/d/"
+    "1cF9mfhyVOukIPydhFN9aG7VryWRvvv8UoqlcHoxsUiI/export?format=csv&gid=2001564991"
+)
+
 
 @dataclass
 class Metric:
@@ -223,11 +228,18 @@ def load_snapshot(uploaded_file: Any) -> tuple[dict[str, Any], str]:
             pd.read_csv(uploaded_file, header=None, engine="python", on_bad_lines="skip")
         ), "Uploaded CSV"
 
+    try:
+        return parse_snapshot(
+            pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, engine="python", on_bad_lines="skip")
+        ), "Live Google Sheet"
+    except Exception:
+        pass
+
     recent_csv = find_recent_csv()
     if recent_csv is not None:
         return parse_snapshot(
             pd.read_csv(recent_csv, header=None, engine="python", on_bad_lines="skip")
-        ), f"Auto-loaded from Downloads: {recent_csv.name}"
+        ), f"Local CSV fallback: {recent_csv.name}"
 
     return parse_snapshot(
         pd.read_csv(io.StringIO(SAMPLE_CSV), header=None, engine="python", on_bad_lines="skip")
