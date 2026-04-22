@@ -185,10 +185,6 @@ def parse_snapshot(df: pd.DataFrame) -> dict[str, Any]:
 
 
 def find_recent_csv() -> Path | None:
-    downloads = Path.home() / "Downloads"
-    if not downloads.exists():
-        return None
-
     candidates = []
     priority_terms = (
         "dane",
@@ -198,10 +194,18 @@ def find_recent_csv() -> Path | None:
         "output",
     )
 
-    for path in downloads.glob("*.csv"):
-        name = path.name.lower()
-        score = sum(term in name for term in priority_terms)
-        candidates.append((score, path.stat().st_mtime, path))
+    search_dirs = [
+        Path.home() / "Desktop",
+        Path.home() / "Downloads",
+    ]
+
+    for directory in search_dirs:
+        if not directory.exists():
+            continue
+        for path in directory.glob("*.csv"):
+            name = path.name.lower()
+            score = sum(term in name for term in priority_terms)
+            candidates.append((score, path.stat().st_mtime, path))
 
     if not candidates:
         return None
