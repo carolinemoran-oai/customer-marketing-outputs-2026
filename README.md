@@ -23,14 +23,28 @@ Set `SERVER_NAME` to the app domain if your host requires it. `PORT` is usually 
 
 ## Keep the shared dashboard current
 
-The shared dashboard should read the Google Sheet directly. CSV upload is only for a one-session local preview; it does not publish data to Streamlit Cloud.
+The shared dashboard can read either the Google Sheet directly or a published CSV snapshot from this repo. CSV upload inside the Streamlit sidebar is only for a one-session local preview; it does not publish data to Streamlit Cloud.
 
-To keep the shared URL current:
+If your Google Workspace allows service accounts, keep the shared URL current this way:
 
 1. Configure the deployed Streamlit app's Secrets with the `[connections.gsheets]` service account block below.
 2. Share the Google Sheet with the service account email address as a viewer.
 3. Update the `Master total_for Dane` tab in Google Sheets.
 4. Use the dashboard's `Refresh source` button when you want to force a rerun.
+
+If Google Cloud or public Sheet sharing is blocked, publish the latest CSV snapshot instead:
+
+```bash
+python publish_snapshot.py --push
+```
+
+By default, the script picks the newest matching CSV from Desktop or Downloads. You can also pass a specific export:
+
+```bash
+python publish_snapshot.py ~/Downloads/my-export.csv --push
+```
+
+The shared app reads `data/latest_snapshot.csv` when Google Sheets access is unavailable.
 
 ## Load live data
 

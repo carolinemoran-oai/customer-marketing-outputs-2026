@@ -22,6 +22,7 @@ GOOGLE_SHEET_URL = (
     "1cF9mfhyVOukIPydhFN9aG7VryWRvvv8UoqlcHoxsUiI/edit?gid=2001564991#gid=2001564991"
 )
 GOOGLE_SHEET_WORKSHEET = "Master total_for Dane"
+PUBLISHED_SNAPSHOT_PATH = Path(__file__).parent / "data" / "latest_snapshot.csv"
 
 
 @dataclass
@@ -267,6 +268,11 @@ def load_snapshot(uploaded_file: Any) -> tuple[dict[str, Any], str, str | None]:
     except Exception:
         pass
 
+    if PUBLISHED_SNAPSHOT_PATH.exists():
+        return parse_snapshot(
+            pd.read_csv(PUBLISHED_SNAPSHOT_PATH, header=None, engine="python", on_bad_lines="skip")
+        ), "Published CSV snapshot", live_sheet_error
+
     recent_csv = find_recent_csv()
     if recent_csv is not None:
         return parse_snapshot(
@@ -478,10 +484,12 @@ pipeline = snapshot["pipeline"]
 st.sidebar.caption(f"Current source: {source_label}")
 if source_label == "Live Google Sheet":
     st.sidebar.success("Shared dashboard is reading the live Google Sheet.")
+elif source_label == "Published CSV snapshot":
+    st.sidebar.success("Shared dashboard is reading the latest published CSV snapshot.")
 elif uploaded_file is not None:
     st.sidebar.info("This upload is local to your current session and will not update the shared dashboard.")
 else:
-    st.sidebar.info("Add Google Sheets secrets in Streamlit Cloud to keep the shared dashboard current.")
+    st.sidebar.info("Publish a CSV snapshot from your local machine to keep the shared dashboard current.")
 
 if source_warning and source_label != "Live Google Sheet":
     st.sidebar.warning(f"Live Google Sheet unavailable: {source_warning}")
@@ -739,6 +747,8 @@ with st.expander("How to use your real sheet export"):
     st.markdown(
         f"""
         For the shared dashboard, update the `{GOOGLE_SHEET_WORKSHEET}` tab in Google Sheets and keep Streamlit Cloud secrets configured for that Sheet.
+
+        If Google Cloud access is blocked, publish a CSV snapshot from this repo with `python publish_snapshot.py --push`.
 
         For a local-only preview, open `{GOOGLE_SHEET_WORKSHEET}`, use `File -> Download -> Comma-separated values (.csv)`, then upload that CSV in the sidebar.
 
