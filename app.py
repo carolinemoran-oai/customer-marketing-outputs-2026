@@ -8,10 +8,20 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+try:
+    from streamlit_gsheets import GSheetsConnection
+except ImportError:
+    GSheetsConnection = None
+
 GOOGLE_SHEET_CSV_URL = (
     "https://docs.google.com/spreadsheets/d/"
     "1cF9mfhyVOukIPydhFN9aG7VryWRvvv8UoqlcHoxsUiI/export?format=csv&gid=2001564991"
 )
+GOOGLE_SHEET_URL = (
+    "https://docs.google.com/spreadsheets/d/"
+    "1cF9mfhyVOukIPydhFN9aG7VryWRvvv8UoqlcHoxsUiI/edit?gid=2001564991#gid=2001564991"
+)
+GOOGLE_SHEET_WORKSHEET = "Master total_for Dane"
 
 
 @dataclass
@@ -222,16 +232,38 @@ def find_recent_csv() -> Path | None:
     return best_path
 
 
-def load_snapshot(uploaded_file: Any) -> tuple[dict[str, Any], str]:
+def load_live_google_sheet() -> tuple[pd.DataFrame | None, str | None]:
+    if GSheetsConnection is None:
+        return None, "Google Sheets connector package is not installed."
+
+    try:
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        df = conn.read(
+            worksheet=GOOGLE_SHEET_WORKSHEET,
+            ttl=0,
+            header=None,
+        )
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return df, None
+        return None, "Google Sheets connection returned no rows."
+    except Exception as exc:
+        return None, str(exc)
+
+
+def load_snapshot(uploaded_file: Any) -> tuple[dict[str, Any], str, str | None]:
     if uploaded_file is not None:
         return parse_snapshot(
             pd.read_csv(uploaded_file, header=None, engine="python", on_bad_lines="skip")
-        ), "Uploaded CSV"
+        ), "Uploaded CSV", None
+
+    live_sheet_df, live_sheet_error = load_live_google_sheet()
+    if live_sheet_df is not None:
+        return parse_snapshot(live_sheet_df), "Live Google Sheet", None
 
     try:
         return parse_snapshot(
             pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, engine="python", on_bad_lines="skip")
-        ), "Live Google Sheet"
+        ), "Public Google Sheet export", live_sheet_error
     except Exception:
         pass
 
@@ -239,11 +271,11 @@ def load_snapshot(uploaded_file: Any) -> tuple[dict[str, Any], str]:
     if recent_csv is not None:
         return parse_snapshot(
             pd.read_csv(recent_csv, header=None, engine="python", on_bad_lines="skip")
-        ), f"Local CSV fallback: {recent_csv.name}"
+        ), f"Local CSV fallback: {recent_csv.name}", live_sheet_error
 
     return parse_snapshot(
         pd.read_csv(io.StringIO(SAMPLE_CSV), header=None, engine="python", on_bad_lines="skip")
-    ), "Built-in sample snapshot"
+    ), "Built-in sample snapshot", live_sheet_error
 
 
 def progress_color(progress: float) -> str:
@@ -422,24 +454,37 @@ st.sidebar.markdown(
     """
     <div class="upload-tip">
       <div class="eyebrow">Refresh Flow</div>
-      Download the active Google Sheet tab as a CSV, then upload it here to refresh the dashboard.
+      Shared data stays current through the connected Google Sheet. CSV upload is a one-session preview.
     </div>
     """,
     unsafe_allow_html=True,
 )
+if st.sidebar.button("Refresh source", use_container_width=True):
+    st.cache_data.clear()
+    st.rerun()
+
 uploaded_file = st.sidebar.file_uploader(
     "Upload CSV export of `Master total_for Dane`",
     type=["csv"],
-    help="In Google Sheets: File -> Download -> Comma-separated values (.csv) for the active tab.",
+    help="CSV uploads only update this browser session. Update the connected Google Sheet to refresh the shared dashboard.",
 )
 
-snapshot, source_label = load_snapshot(uploaded_file)
+snapshot, source_label, source_warning = load_snapshot(uploaded_file)
 annual_metrics = snapshot["annual_metrics"]
 supporting_metrics = snapshot["supporting_metrics"]
 quarterly_metrics = snapshot["quarterly_metrics"]
 pipeline = snapshot["pipeline"]
 
 st.sidebar.caption(f"Current source: {source_label}")
+if source_label == "Live Google Sheet":
+    st.sidebar.success("Shared dashboard is reading the live Google Sheet.")
+elif uploaded_file is not None:
+    st.sidebar.info("This upload is local to your current session and will not update the shared dashboard.")
+else:
+    st.sidebar.info("Add Google Sheets secrets in Streamlit Cloud to keep the shared dashboard current.")
+
+if source_warning and source_label != "Live Google Sheet":
+    st.sidebar.warning(f"Live Google Sheet unavailable: {source_warning}")
 
 overall_progress = (
     (snapshot["ships_grand_total"] / snapshot["annual_goal_total"]) * 100
@@ -554,7 +599,7 @@ with left:
                     "Remaining": "{:.2f}",
                 }
             ),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -590,7 +635,7 @@ with right:
             selected_quarter_df.style.format(
                 {"Quarterly Goal": "{:.2f}", "Progress %": "{:.0f}%"}
             ),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -625,7 +670,7 @@ with pipeline_left:
     selected_lane = st.selectbox("Choose a content lane", list(pipeline.keys()))
     lane_items = pipeline[selected_lane]
     lane_df = pd.DataFrame(lane_items).rename(columns={"item": "Item", "measure": "Count / Status"})
-    st.dataframe(lane_df, use_container_width=True, hide_index=True)
+    st.dataframe(lane_df, width="stretch", hide_index=True)
 
 with pipeline_right:
     st.markdown('<div class="section-title">Quick Read</div>', unsafe_allow_html=True)
@@ -692,11 +737,12 @@ with bottom_right:
 
 with st.expander("How to use your real sheet export"):
     st.markdown(
-        """
-        1. Open the `Master total_for Dane` tab in Google Sheets.
-        2. Use `File -> Download -> Comma-separated values (.csv)` while that tab is active.
-        3. Upload the CSV in the sidebar.
-        4. The dashboard will swap from the sample snapshot to your exported data.
+        f"""
+        For the shared dashboard, update the `{GOOGLE_SHEET_WORKSHEET}` tab in Google Sheets and keep Streamlit Cloud secrets configured for that Sheet.
+
+        For a local-only preview, open `{GOOGLE_SHEET_WORKSHEET}`, use `File -> Download -> Comma-separated values (.csv)`, then upload that CSV in the sidebar.
+
+        Sheet URL: {GOOGLE_SHEET_URL}
         """
     )
 
