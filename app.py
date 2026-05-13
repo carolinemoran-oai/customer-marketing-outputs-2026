@@ -261,17 +261,17 @@ def load_snapshot(uploaded_file: Any) -> tuple[dict[str, Any], str, str | None]:
     if live_sheet_df is not None:
         return parse_snapshot(live_sheet_df), "Live Google Sheet", None
 
+    if PUBLISHED_SNAPSHOT_PATH.exists():
+        return parse_snapshot(
+            pd.read_csv(PUBLISHED_SNAPSHOT_PATH, header=None, engine="python", on_bad_lines="skip")
+        ), "Published CSV snapshot", live_sheet_error
+
     try:
         return parse_snapshot(
             pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, engine="python", on_bad_lines="skip")
         ), "Public Google Sheet export", live_sheet_error
     except Exception:
         pass
-
-    if PUBLISHED_SNAPSHOT_PATH.exists():
-        return parse_snapshot(
-            pd.read_csv(PUBLISHED_SNAPSHOT_PATH, header=None, engine="python", on_bad_lines="skip")
-        ), "Published CSV snapshot", live_sheet_error
 
     recent_csv = find_recent_csv()
     if recent_csv is not None:
